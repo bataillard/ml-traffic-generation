@@ -74,6 +74,13 @@ class WindowGenerator():
             f'Label indices: {self.label_indices}',
             f'Label column name(s): {self.label_columns}'])
     
+    
+    def set_example(self, inputs, labels):
+        self._example = inputs, labels
+        
+    def test_function(self):
+        print('Test')
+    
     def split_window(self, features):
         inputs = features[:, self.input_slice, :]
         labels = features[:, self.labels_slice, :]
@@ -88,6 +95,7 @@ class WindowGenerator():
         labels.set_shape([None, self.label_width, None])
         
         return inputs, labels
+    
     
     def plot(self, model=None, plot_col='weight', max_subplots=3):
         inputs, labels = self.example
@@ -137,7 +145,7 @@ class WindowGenerator():
         return self.make_dataset(self.train_df)
     
     @property
-     def val(self):
+    def val(self):
         return self.make_dataset(self.val_df)
     
     @property
