@@ -23,8 +23,9 @@ def load_dataframe(path, cols_map):
     return NotImplementedError
 
 # --- DATA PREPARATION ---
-def split_norm_data(data):
-    ''' Returns a 70/20/10 split for normalized training, validating, & testing data '''
+def split_norm_data(data, return_mean_std=False):
+    ''' Returns a 70/20/10 split for normalized training, validating, & testing data.
+        If `return_mean_std` is True, also returns the mean and std of the training set'''
     n = len(data.index)
     # Split
     train, val, test = data[0:int(n*0.7)], data[int(n*0.7):int(n*0.9)], data[int(n*0.9):]
@@ -33,7 +34,11 @@ def split_norm_data(data):
     train = (train - mean) / std
     val = (val - mean) / std
     test = (test - mean) / std
-    return train, val, test
+    
+    if return_mean_std:
+        return train, val, test, mean, std
+    else:
+        return train, val, test
 
 # --- WindowGenerator CLASS ---
 class WindowGenerator():
@@ -97,7 +102,7 @@ class WindowGenerator():
         return inputs, labels
     
     
-    def plot(self, model=None, plot_col='weight', max_subplots=3):
+    def plot(self, model=None, plot_col='n_vehicles', max_subplots=3):
         inputs, labels = self.example
         plt.figure(figsize=(12, 8))
         plot_col_index = self.column_indices[plot_col]
@@ -116,13 +121,12 @@ class WindowGenerator():
             if label_col_index is None:
                 continue
                 
-            plt.scatter(self.label_indices, labels[n, :, label_col_index],
-                        edgecolors='k', label='Labels', c='#2ca02c', s=64)
+            plt.plot(self.label_indices, labels[n, :, label_col_index],
+                     label='Labels', color='#2ca02c', marker='.', ms=10)
             if model is not None:
                 predictions = model(inputs)
-                plt.scatter(self.label_indices, predictions[n, :, label_col_index],
-                            marker='X', edgecolors='k', label='Predictions',
-                            c='#ff7f0e', s=64)
+                plt.plot(self.label_indices, predictions[n, :, label_col_index], 
+                         marker='X', label='Predictions', color='#ff7f0e')
             
             if n == 0:
                 plt.legend()
@@ -164,22 +168,22 @@ class WindowGenerator():
         return result
 
 # --- WINDOWS ---
-def single_step_window(train, val, test, label_cols=['weight']):
+def single_step_window(train, val, test, label_cols=['n_vehicles']):
     return WindowGenerator(
         train_df=train, val_df=val, test_df=test,
         input_width=1, label_width=1, shift=1,
         label_columns=label_cols)
 
-def wide_window(train, val, test, label_cols=['weight']):
+def wide_window(train, val, test, label_cols=['n_vehicles']):
     return WindowGenerator(input_width=24, label_width=24, shift=1, label_columns=label_cols,
                            train_df=train, val_df=val, test_df=test)
 
-def conv_window(train, val, test, input_w=1, label_w=1, label_cols=['weight']):
+def conv_window(train, val, test, input_w=1, label_w=1, label_cols=['n_vehicles']):
     return WindowGenerator(input_width=input_w, label_width=label_w, shift=1, label_columns=label_cols,
                             train_df=train, val_df=val, test_df=test)
 
 # Better function easier to understand in code (just use constructor otherwise lol)
-def make_window(train, val, test, input_w=1, label_w=1, shift=1, label_cols=['weight']):
+def make_window(train, val, test, input_w=1, label_w=1, shift=1, label_cols=['n_vehicles']):
     return WindowGenerator(input_width=input_w, label_width=label_w, shift=shift, label_columns=label_cols, 
                           train_df=train, val_df=val, test_df=test)
 
