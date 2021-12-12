@@ -127,7 +127,7 @@ class WindowGenerator():
             if n == 0:
                 plt.legend()
                 
-        plt.xlabel('Time []') # TODO specify
+        plt.xlabel('Time [h]') # Time steps between datapoints
 
     def make_dataset(self, data):
         data = np.array(data, dtype=np.float32)
@@ -163,11 +163,85 @@ class WindowGenerator():
             self._example = result
         return result
 
-# --- SINGLE STEP MODELS --- à priori on va pas utiliser ça jpense
+# --- WINDOWS ---
 def single_step_window(train, val, test, label_cols=['weight']):
     return WindowGenerator(
         train_df=train, val_df=val, test_df=test,
         input_width=1, label_width=1, shift=1,
         label_columns=label_cols)
 
-# --- MULTI STEP MODELS ---
+def wide_window(train, val, test, label_cols=['weight']):
+    return WindowGenerator(input_width=24, label_width=24, shift=1, label_columns=label_cols,
+                           train_df=train, val_df=val, test_df=test)
+
+def conv_window(train, val, test, input_w=1, label_w=1, label_cols=['weight']):
+    return WindowGenerator(input_width=input_w, label_width=label_w, shift=1, label_columns=label_cols,
+                            train_df=train, val_df=val, test_df=test)
+
+# --- MODELS ---
+def compile_and_fit(model, window, patience=2):
+    MAX_EPOCHS = 20
+    early_stopping = tf.keras.callbacks.EarlyStopping(monitor='val_loss',
+                                                      patience=patience,
+                                                      mode='min')
+
+    model.compile(loss=tf.losses.MeanSquaredError(),
+                  optimizer=tf.optimizers.Adam(),
+                  metrics=[tf.metrics.MeanAbsoluteError()])
+
+    history = model.fit(window.train, epochs=MAX_EPOCHS,
+                        validation_data=window.val,
+                        callbacks=[early_stopping])
+    return history
+
+class Baseline(tf.keras.Model):
+    def __init__(self, label_index=None):
+        super().__init__()
+        self.label_index = label_index
+
+    def call(self, inputs):
+        if self.label_index is None:
+            return inputs
+        result = inputs[:, :, self.label_index]
+        return result[:, :, tf.newaxis]
+    
+def linear_model():
+    return tf.keras.Sequential([
+        tf.keras.layers.Dense(units=1)
+    ])
+
+def dense_model():
+    return tf.keras.Sequential([
+        tf.keras.layers.Dense(units=64, activation='relu'),
+        tf.keras.layers.Dense(units=64, activation='relu'),
+        tf.keras.layers.Dense(units=1)
+    ])
+
+def multi_step_dense_model():
+    return tf.keras.Sequential([
+        # Shape: (time, features) => (time*features)
+        tf.keras.layers.Flatten(),
+        tf.keras.layers.Dense(units=32, activation='relu'),
+        tf.keras.layers.Dense(units=32, activation='relu'),
+        tf.keras.layers.Dense(units=1),
+        # Add back the time dimension.
+        # Shape: (outputs) => (1, outputs)
+        tf.keras.layers.Reshape([1, -1]),
+    ])
+    
+def conv_model(conv_width):
+    return tf.keras.Sequential([
+        tf.keras.layers.Conv1D(filters=32,
+                               kernel_size=(conv_width,),
+                               activation='relu'),
+        tf.keras.layers.Dense(units=32, activation='relu'),
+        tf.keras.layers.Dense(units=1),
+    ])
+
+def lstm_model():
+    return tf.keras.models.Sequential([
+        # Shape [batch, time, features] => [batch, time, lstm_units]
+        tf.keras.layers.LSTM(32, return_sequences=True),
+        # Shape => [batch, time, features]
+        tf.keras.layers.Dense(units=1)
+    ])
