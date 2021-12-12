@@ -178,6 +178,11 @@ def conv_window(train, val, test, input_w=1, label_w=1, label_cols=['weight']):
     return WindowGenerator(input_width=input_w, label_width=label_w, shift=1, label_columns=label_cols,
                             train_df=train, val_df=val, test_df=test)
 
+# Better function easier to understand in code (just use constructor otherwise lol)
+def make_window(train, val, test, input_w=1, label_w=1, shift=1, label_cols=['weight']):
+    return WindowGenerator(input_width=input_w, label_width=label_w, shift=shift, label_columns=label_cols, 
+                          train_df=train, val_df=val, test_df=test)
+
 # --- MODELS ---
 def compile_and_fit(model, window, patience=2):
     MAX_EPOCHS = 20
