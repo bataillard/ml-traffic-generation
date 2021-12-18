@@ -33,7 +33,7 @@ def best_alpha(window):
     performances = {}
     for alpha in alphas:
         n_units = n_hidden_nodes(num_features, num_features, num_train, alpha)
-        model = FeedBack(units=n_units, out_steps=24)
+        model = FeedBack(units=n_units, num_features=num_features, out_steps=24)
 
         compile_and_fit(model, window)
         clear_output()
