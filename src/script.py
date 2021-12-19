@@ -23,12 +23,16 @@ def load_dataframe(path, cols_map):
     return NotImplementedError
 
 # --- DATA PREPARATION ---
-def split_norm_data(data, return_mean_std=False):
+def split_norm_data(data, return_mean_std=False, splitter=None):
     ''' Returns a 70/20/10 split for normalized training, validating, & testing data.
         If `return_mean_std` is True, also returns the mean and std of the training set'''
     n = len(data.index)
     # Split
-    train, val, test = data[0:int(n*0.7)], data[int(n*0.7):int(n*0.9)], data[int(n*0.9):]
+    if splitter:
+        train, val, test = splitter(data)
+    else:
+        train, val, test = data[0:int(n*0.7)], data[int(n*0.7):int(n*0.9)], data[int(n*0.9):]
+       
     # Normalize
     mean, std = train.mean(), train.std()
     train = (train - mean) / std
@@ -43,12 +47,14 @@ def split_norm_data(data, return_mean_std=False):
 # --- WindowGenerator CLASS ---
 class WindowGenerator():
     def __init__(self, input_width, label_width, shift,
-               train_df, val_df, test_df,
-               label_columns=None):
+                 train_df, val_df, test_df, mean, std,
+                 label_columns=None, zero_column='n_vehicles'):
         # Store the raw data.
         self.train_df = train_df
         self.val_df = val_df
         self.test_df = test_df
+        self.mean = mean[zero_column]
+        self.std = std[zero_column]
 
         # Work out the label column indices.
         self.label_columns = label_columns
@@ -57,6 +63,7 @@ class WindowGenerator():
                                         enumerate(label_columns)}
         self.column_indices = {name: i for i, name in
                                enumerate(train_df.columns)}
+        self.zero_column_index = train_df.columns.get_loc(zero_column)
 
         # Work out the window parameters.
         self.input_width = input_width
@@ -104,14 +111,17 @@ class WindowGenerator():
     
     def plot(self, model=None, plot_col='n_vehicles', max_subplots=3):
         inputs, labels = self.example
-        plt.figure(figsize=(12, 8))
         plot_col_index = self.column_indices[plot_col]
         max_n = min(max_subplots, len(inputs))
+        
+        fig, axs = plt.subplots(max_n, 2, figsize=(12, 8), sharey='row', sharex='col')
+
         for n in range(max_n):
-            plt.subplot(max_n, 1, n+1)
-            plt.ylabel(f'{plot_col} [normed]')
-            plt.plot(self.input_indices, inputs[n, :, plot_col_index], 
-                     label='Inputs', marker='.', zorder=-10)
+            ax_in = axs[n, 0]
+            
+            ax_in.set_ylabel(f'{plot_col} [normed]')
+            ax_in.plot(self.input_indices, inputs[n, :, plot_col_index], 
+                       label='Inputs', marker='.', zorder=-10)
             
             if self.label_columns:
                 label_col_index = self.label_columns_indices.get(plot_col, None)
@@ -120,28 +130,55 @@ class WindowGenerator():
                 
             if label_col_index is None:
                 continue
-                
-            plt.plot(self.label_indices, labels[n, :, label_col_index],
-                     label='Labels', color='#2ca02c', marker='.', ms=10)
+            
+            ax_out = axs[n, 1]
+            
+            ax_out.plot(self.label_indices, labels[n, :, label_col_index],
+                        label='Labels', color='#2ca02c', marker='.', ms=10)
             if model is not None:
                 predictions = model(inputs)
-                plt.plot(self.label_indices, predictions[n, :, label_col_index], 
-                         marker='X', label='Predictions', color='#ff7f0e')
+                ax_out.scatter(self.label_indices, predictions[n, :, label_col_index], 
+                               marker='X', label='Predictions', color='#ff7f0e')
             
             if n == 0:
-                plt.legend()
+                ax_in.legend()
+                ax_out.legend()
                 
-        plt.xlabel('Time [h]') # Time steps between datapoints
+            ax_in.set_xlabel('Time [h]')
+            ax_out.set_xlabel('Time [h]')
+            
+        return fig
+    
+       
+    def make_dataset(self, data, training=True):
+        
+        def filter_zero_weeks(window):
+            start = window[0:self.input_width, self.zero_column_index] * self.std + self.mean
+            end = window[self.label_start:self.label_start + self.label_width,
+                        self.zero_column_index] * self.std + self.mean
+                        
+            # Both start or end must be non zero
+            return tf.reduce_any(tf.abs(start) >= 1e-4) and tf.reduce_any(tf.abs(end) >= 1e-4)
 
-    def make_dataset(self, data):
+        batch_size = 32 if training else 52
+        sequence_stride = 1 if training else self.input_width
+        shuffle = training
+        
         data = np.array(data, dtype=np.float32)
         ds = tf.keras.preprocessing.timeseries_dataset_from_array(
             data=data, targets=None,
             sequence_length=self.total_window_size,
-            sequence_stride=1, shuffle=True,
-            batch_size=32,)
+            sequence_stride=sequence_stride, shuffle=shuffle,
+            batch_size=batch_size,)
+        
+        if training:
+            # Remove periods where sensors output zero => consider as invalid data
+            ds = ds.unbatch()
+            ds = ds.filter(filter_zero_weeks)
+            ds = ds.batch(batch_size)
         
         ds = ds.map(self.split_window)
+        
         return ds
     
     @property
@@ -183,9 +220,10 @@ def conv_window(train, val, test, input_w=1, label_w=1, label_cols=['n_vehicles'
                             train_df=train, val_df=val, test_df=test)
 
 # Better function easier to understand in code (just use constructor otherwise lol)
-def make_window(train, val, test, input_w=1, label_w=1, shift=1, label_cols=['n_vehicles']):
+def make_window(train, val, test, mean, std,
+                input_w=1, label_w=1, shift=1, label_cols=['n_vehicles']):
     return WindowGenerator(input_width=input_w, label_width=label_w, shift=shift, label_columns=label_cols, 
-                          train_df=train, val_df=val, test_df=test)
+                          train_df=train, val_df=val, test_df=test, mean=mean, std=std)
 
 # --- MODELS ---
 def compile_and_fit(model, window, patience=2):
@@ -247,10 +285,10 @@ def conv_model(conv_width):
         tf.keras.layers.Dense(units=1),
     ])
 
-def lstm_model():
+def lstm_model(num_features):
     return tf.keras.models.Sequential([
         # Shape [batch, time, features] => [batch, time, lstm_units]
         tf.keras.layers.LSTM(32, return_sequences=True),
         # Shape => [batch, time, features]
-        tf.keras.layers.Dense(units=1)
+        tf.keras.layers.Dense(units=num_features)
     ])
