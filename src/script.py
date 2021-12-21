@@ -126,9 +126,6 @@ class WindowGenerator():
     
     def set_example(self, inputs, labels):
         self._example = inputs, labels
-        
-    def test_function(self):
-        print('Test')
     
     def split_window(self, features):
         inputs = features[:, self.input_slice, :]
@@ -186,16 +183,17 @@ class WindowGenerator():
             
         return fig
     
-       
-    def make_dataset(self, data, training=True):
-        
-        def filter_zero_weeks(window):
-            start = window[0:self.input_width, self.zero_column_index] * self.std + self.mean
-            end = window[self.label_start:self.label_start + self.label_width,
+    def filter_zero_weeks(self, row):
+            start = row[0:self.input_width, self.zero_column_index] * self.std + self.mean
+            end = row[self.label_start:self.label_start + self.label_width,
                         self.zero_column_index] * self.std + self.mean
                         
             # Both start or end must be non zero
-            return tf.reduce_any(tf.abs(start) >= 1e-4) and tf.reduce_any(tf.abs(end) >= 1e-4)
+            return tf.logical_and(tf.reduce_any(tf.abs(start) >= 1e-4), 
+                                  tf.reduce_any(tf.abs(end) >= 1e-4))
+
+    
+    def make_dataset(self, data, training=True):
 
         batch_size = 32 if training else 52
         sequence_stride = 1 if training else self.input_width
@@ -211,7 +209,7 @@ class WindowGenerator():
         if training:
             # Remove periods where sensors output zero => consider as invalid data
             ds = ds.unbatch()
-            ds = ds.filter(filter_zero_weeks)
+            ds = ds.filter(self.filter_zero_weeks)
             ds = ds.batch(batch_size)
         
         ds = ds.map(self.split_window)
@@ -264,7 +262,7 @@ def make_window(train, val, test, mean, std,
 
 # --- MODELS ---
 def compile_and_fit(model, data, patience=2, data_is_window=True,
-                    metric=tf.metrics.MeanAbsoluteError()):
+                    metrics=[tf.metrics.MeanAbsoluteError()]):
     MAX_EPOCHS = 20
     early_stopping = tf.keras.callbacks.EarlyStopping(monitor='val_loss',
                                                       patience=patience,
@@ -272,7 +270,7 @@ def compile_and_fit(model, data, patience=2, data_is_window=True,
 
     model.compile(loss=tf.losses.MeanSquaredError(),
                   optimizer=tf.optimizers.Adam(),
-                  metrics=[metric])
+                  metrics=metrics)
     
     if data_is_window:
         train, val = data.train, data.val
@@ -284,16 +282,6 @@ def compile_and_fit(model, data, patience=2, data_is_window=True,
                         callbacks=[early_stopping])
     return history
 
-class Baseline(tf.keras.Model):
-    def __init__(self, label_index=None):
-        super().__init__()
-        self.label_index = label_index
-
-    def call(self, inputs):
-        if self.label_index is None:
-            return inputs
-        result = inputs[:, :, self.label_index]
-        return result[:, :, tf.newaxis]
     
 def linear_model(output_layers=1):
     return tf.keras.Sequential([
