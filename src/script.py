@@ -23,7 +23,7 @@ def load_dataframe(path, cols_map):
     return NotImplementedError
 
 # --- DATA PREPARATION ---
-def split_norm_data(data, return_mean_std=False, splitter=None):
+def split_norm_data(data, return_mean_std=False, splitter=None, mean_std_scalars=False):
     ''' Returns a 70/20/10 split for normalized training, validating, & testing data.
         If `return_mean_std` is True, also returns the mean and std of the training set'''
     n = len(data.index)
@@ -34,7 +34,11 @@ def split_norm_data(data, return_mean_std=False, splitter=None):
         train, val, test = data[0:int(n*0.7)], data[int(n*0.7):int(n*0.9)], data[int(n*0.9):]
        
     # Normalize
-    mean, std = train.mean(), train.std()
+    if mean_std_scalars:
+        mean, std = train.values.mean(), train.values.std()
+    else: 
+        mean, std = train.mean(), train.std()
+    
     train = (train - mean) / std
     val = (val - mean) / std
     test = (test - mean) / std
@@ -43,6 +47,39 @@ def split_norm_data(data, return_mean_std=False, splitter=None):
         return train, val, test, mean, std
     else:
         return train, val, test
+    
+def year_splitter(data, val_years=2, test_years=2):
+    """Takes a time series and returns a split into training, validation, and test dataset.
+    The split respects the ordering of the data, so the training set happens before the validation set,
+    which is before the test set.
+    The test and validation will be of length `test_year` and `val_years` respectively (in years).
+    The training set is any remaining data"""
+    # Consider year as discrete number of weeks
+    weeks_in_year = 52
+    days_in_year = 7 * weeks_in_year
+    year_delta = pd.Timedelta(f"{days_in_year} days")
+    
+    test_split = data.index.max() - test_years * year_delta
+    val_split = test_split - val_years * year_delta
+    
+    return data[:val_split], data[val_split:test_split], data[test_split:]
+
+# Add sin/cos periodicity columns to features dataframe
+def add_time_period_cols(data, time_length, time_string):
+    """Takes a time series, a period in seconds, and returns a column name.
+    Returns a copy of the dataset with the sin and cos of the timeseries index along the
+    given period"""
+    data = data.copy()
+    
+    # Transform datetime index to seconds
+    timestamp_s = data.index.map(pd.Timestamp.timestamp)
+    
+    data[time_string + '_sin'] = np.sin(timestamp_s * (2 * np.pi / time_length))
+    data[time_string + '_cos'] = np.cos(timestamp_s * (2 * np.pi / time_length))
+    
+    return data
+
+
 
 # --- WindowGenerator CLASS ---
 class WindowGenerator():
@@ -226,7 +263,8 @@ def make_window(train, val, test, mean, std,
                           train_df=train, val_df=val, test_df=test, mean=mean, std=std)
 
 # --- MODELS ---
-def compile_and_fit(model, window, patience=2):
+def compile_and_fit(model, data, patience=2, data_is_window=True,
+                    metric=tf.metrics.MeanAbsoluteError()):
     MAX_EPOCHS = 20
     early_stopping = tf.keras.callbacks.EarlyStopping(monitor='val_loss',
                                                       patience=patience,
@@ -234,10 +272,15 @@ def compile_and_fit(model, window, patience=2):
 
     model.compile(loss=tf.losses.MeanSquaredError(),
                   optimizer=tf.optimizers.Adam(),
-                  metrics=[tf.metrics.MeanAbsoluteError()])
+                  metrics=[metric])
+    
+    if data_is_window:
+        train, val = data.train, data.val
+    else:
+        train, val = data
 
-    history = model.fit(window.train, epochs=MAX_EPOCHS,
-                        validation_data=window.val,
+    history = model.fit(train, epochs=MAX_EPOCHS,
+                        validation_data=val,
                         callbacks=[early_stopping])
     return history
 
@@ -252,16 +295,16 @@ class Baseline(tf.keras.Model):
         result = inputs[:, :, self.label_index]
         return result[:, :, tf.newaxis]
     
-def linear_model():
+def linear_model(output_layers=1):
     return tf.keras.Sequential([
-        tf.keras.layers.Dense(units=1)
+        tf.keras.layers.Dense(units=output_layers)
     ])
 
-def dense_model():
+def dense_model(output_layers=1):
     return tf.keras.Sequential([
         tf.keras.layers.Dense(units=64, activation='relu'),
         tf.keras.layers.Dense(units=64, activation='relu'),
-        tf.keras.layers.Dense(units=1)
+        tf.keras.layers.Dense(units=output_layers)
     ])
 
 def multi_step_dense_model():
@@ -276,13 +319,13 @@ def multi_step_dense_model():
         tf.keras.layers.Reshape([1, -1]),
     ])
     
-def conv_model(conv_width):
+def conv_model(conv_width, output_layers=1):
     return tf.keras.Sequential([
         tf.keras.layers.Conv1D(filters=32,
                                kernel_size=(conv_width,),
                                activation='relu'),
         tf.keras.layers.Dense(units=32, activation='relu'),
-        tf.keras.layers.Dense(units=1),
+        tf.keras.layers.Dense(units=output_layers),
     ])
 
 def lstm_model(num_features):
