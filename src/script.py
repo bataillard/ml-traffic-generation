@@ -282,44 +282,13 @@ def compile_and_fit(model, data, patience=2, data_is_window=True,
                         callbacks=[early_stopping])
     return history
 
-    
-def linear_model(output_layers=1):
+def lstm_model(num_labels=3, week_steps=168):
     return tf.keras.Sequential([
-        tf.keras.layers.Dense(units=output_layers)
-    ])
-
-def dense_model(output_layers=1):
-    return tf.keras.Sequential([
-        tf.keras.layers.Dense(units=64, activation='relu'),
-        tf.keras.layers.Dense(units=64, activation='relu'),
-        tf.keras.layers.Dense(units=output_layers)
-    ])
-
-def multi_step_dense_model():
-    return tf.keras.Sequential([
-        # Shape: (time, features) => (time*features)
-        tf.keras.layers.Flatten(),
-        tf.keras.layers.Dense(units=32, activation='relu'),
-        tf.keras.layers.Dense(units=32, activation='relu'),
-        tf.keras.layers.Dense(units=1),
-        # Add back the time dimension.
-        # Shape: (outputs) => (1, outputs)
-        tf.keras.layers.Reshape([1, -1]),
-    ])
-    
-def conv_model(conv_width, output_layers=1):
-    return tf.keras.Sequential([
-        tf.keras.layers.Conv1D(filters=32,
-                               kernel_size=(conv_width,),
-                               activation='relu'),
-        tf.keras.layers.Dense(units=32, activation='relu'),
-        tf.keras.layers.Dense(units=output_layers),
-    ])
-
-def lstm_model(num_features):
-    return tf.keras.models.Sequential([
-        # Shape [batch, time, features] => [batch, time, lstm_units]
-        tf.keras.layers.LSTM(32, return_sequences=True),
-        # Shape => [batch, time, features]
-        tf.keras.layers.Dense(units=num_features)
+        # Shape [batch, time, features] => [batch, lstm_units].
+        tf.keras.layers.LSTM(32, return_sequences=False),
+        # Shape => [batch, out_steps*features].
+        tf.keras.layers.Dense(week_steps*num_labels,
+                              kernel_initializer=tf.initializers.zeros()),
+        # Shape => [batch, out_steps, features].
+        tf.keras.layers.Reshape([week_steps, num_labels])
     ])
