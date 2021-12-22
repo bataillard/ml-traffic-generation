@@ -1,3 +1,7 @@
+% ================================================ %
+% Headers and metadata
+% ================================================ %
+
 \documentclass[10pt,conference,compsocconf]{IEEEtran}
 
 \usepackage{hyperref}
@@ -16,26 +20,63 @@
 
 \maketitle
 
-\section{Abstract}
-
-\cite{tensorflow2015-whitepaper}
 
 % ================================================ %
+% Abstract
+% ================================================ %
 
+\section*{Abstract}
+
+This paper introduces a way to generate synthetic discrete traffic data for use in traffic
+simulators. We present a model capable of taking historical traffic data from a given week and
+predicting the discrete arrival times of vehicles in the same week, one year later. This is achieved 
+using two phases. In the first phase, a recurrent neural network predicts the arrival rate for each 
+hour in the week. In the second phase, a custom discretization model transforms our rates into new 
+discrete arrival times. Our model outperforms our baseline in predicting arrival rates, and is 
+...TODO in generating arrival times.
+
+
+% ================================================ %
+% Introduction
+% ================================================ %
 
 \section{Introduction}
 
-% ================================================ %
+Traffic simulators like SUMO \cite{SUMO2018} need vehicle data to perform modelling tasks. These
+simulators are widely used in the fields of civil engineering and urban planning for modelling complex
+traffic systems. They can provide city-wide traffic forecasts, allow for the evaluation of novel
+traffic control systems, or can even model the effect of autonomous vehicle on traffic patterns. 
 
+To simulate traffic flow, simulators will generate simulated vehicles on a given road based on a 
+log of the speed and arrival time of vehicles on that road. Such real world data is obtained using 
+a car sensor placed on or near the roadway. These sensors are not always online: they can break 
+down or can be moved to be used elsewhere. They also cannot predict future traffic trends. This 
+means that the logs sometimes have large gaps if using real-world data.
+
+In this paper, we present a way to fill in the gaps in traffic logs and to predict future traffic 
+logs up to a year in advance, using machine leaning models. Our model takes a week-long traffic
+log and outputs a traffic log for the same week one year later. It can be combined to predict an 
+entire year in parallel using data from the previous year. 
+
+TODO phases + challenges + results
+
+
+% ================================================ %
+% Exploratory data analysis
+% ================================================ %
 
 \section{Exploratory data analysis}
 
 \subsection{TODO}
 
+\subsection{Year-on-year traffic increases}
+
 \subsection{Zero weeks}
 
-% ================================================ %
 
+% ================================================ %
+% Feature engineering
+% ================================================ %
 
 \section{Feature engineering}
 
@@ -51,6 +92,9 @@
 
 \subsection{Zero weeks filtering}
 
+
+% ================================================ %
+% Model structure and selection
 % ================================================ %
 
 \section{Model structure and selection}
@@ -67,6 +111,9 @@
 
 \subsection{Discrete event generation}
 
+
+% ================================================ %
+% Experimental results
 % ================================================ %
 
 \section{Experimental results}
@@ -76,7 +123,8 @@
 \subsection{Discrete event generation performance}
 
 % ================================================ %
-
+% Future work
+% ================================================ %
 
 \section{Future work}
 
@@ -84,7 +132,18 @@
 
 \subsection{TODO...}
 
+
+% ================================================ %
+% Conclusion
+% ================================================ %
+
 \section{Conclusion}
+
+
+% ================================================ %
+% Bibliography
+% ================================================ %
+
 
 \bibliographystyle{IEEEtran}
 \bibliography{report}
