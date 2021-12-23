@@ -7,23 +7,24 @@ real-world dataset. For this project we chose to collaborate with an EPFL lab TR
 ## Organisation
 This project is organized as follows :
 
+- The repository **_data_** that contains a small dataset **_extract.txt_**
 - the repository **_src_** that includes: 
-    - **_0-sumo.ipynb_** that briefly shows how to simulate traffic using "Simulation of Urban MObility" (SUMO) of our dataset.
+    - **_0-sumo.ipynb_** that briefly explains how to simulate traffic using "Simulation of Urban MObility" (SUMO) of the extract.txt dataset.
     - **_1-data-exploration.ipynb_** were the data exploration of our datasat is made.
     - **_2-forecasting-model-selection.ipynb_** that selects a model to predict the hourly number of cars per week.
     - **_3-sampling-interval-selection.ipynb_** that finds the most appropriate sampling interval for which to predict the number of cars.
     - **_4-rate-prediction.ipynb_** that predicts the number of vehicules, speed and weight per hour that we called "rate".
     - **_5-discrete-event-generation.ipynb_** that converts the previous rate into discrete events.
-    - **_helper-functions.py_** that contains the pipeline and helper functions.
+    - **_utils.py_** that contains the pipeline and helper functions.
     - several .xml files that helps to define the road to generate the traffic on SUMO.
-    - **_test.sumocfg_** that generates a traffic simulation of the dataset on SUMO.   
+    - the repository **_sumo-files_** that contains all the files used to setup the simulation. You can find more infos on each file in the notebook 0-sumo.ipynb 
 - the file **_ML-Project-2.pdf_** which is our report that provides a full explanation of our ML system and our findings.
 
-Dire les librairies utilisés, run nos notebooks de manière successive de 1 à 5, mettre un lien de notre dataset
 ## How to use our project
-Just make sure to have the libraries mentioned below installed on your environment before running the cells in the jupyter notebook.
-To reproduce our setup, please run the notebooks in a successive way (from 1 to 5).
-Don't forget to put the dataset on a repository "data" at the same level of the repository "src". You can find our dataset named "405.txt" on this [link](https://drive.switch.ch/index.php/s/190lRT2jVT5bCgJ).
+- Just make sure to have the libraries mentioned below installed on your environment before running the cells in the jupyter notebook.
+- To reproduce our setup, please run the notebooks in a successive way (from 1 to 5).
+- Don't forget to put the dataset in the repository "data" at the same level of the repository "src". You can find our dataset named "405.txt" on this [link](https://drive.switch.ch/index.php/s/190lRT2jVT5bCgJ).
+- To run SUMO, open XQuartz (if you use MacOS), go to repository **_src_** and type "sumo-gui -c sumo-files/hello.sumocfg" in the terminal.
 
 ## Libraries
 In this project we used these libraries : 
@@ -41,6 +42,8 @@ In this project we used these libraries :
 - pickle
 - statsmodels
 - collections
+- [sumo](https://sumo.dlr.de/docs/Downloads.php)
+- [XQuartz](https://www.xquartz.org/) if using OS X
 
 ## Members of group brr
 - [Luca Bataillard - 282152](https://github.com/bataillard)
