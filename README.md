@@ -1,4 +1,4 @@
-# CS-433 - Machine learning projet 2
+# CS-433 - Machine Learning project 2
 
 ## Introduction
 The aim of this project is to learn to use the concepts of machine learning presented in the lectures and practiced in the labs on a
