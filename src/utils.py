@@ -262,7 +262,8 @@ def make_window(train, val, test, mean, std,
 
 # --- MODELS ---
 def compile_and_fit(model, data, patience=2, data_is_window=True,
-                    metrics=[tf.metrics.MeanAbsoluteError()]):
+                    metrics=[tf.metrics.MeanSquaredError(),
+                             tf.metrics.MeanAbsoluteError()]):
     MAX_EPOCHS = 20
     early_stopping = tf.keras.callbacks.EarlyStopping(monitor='val_loss',
                                                       patience=patience,
