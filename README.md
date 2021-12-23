@@ -7,7 +7,8 @@ real-world dataset. For this project we chose to collaborate with an EPFL lab TR
 ## Organisation
 This project is organized as follows :
 
-- The repository **_data_** that contains a small dataset **_extract.txt_**
+- the repository **_data_** that contains a small dataset **_extract.txt_**
+- the repository **_report_** that contains the LaTeX template of our final written report.
 - the repository **_src_** that includes: 
     - **_0-sumo.ipynb_** that briefly explains how to simulate traffic using "Simulation of Urban MObility" (SUMO) of the extract.txt dataset.
     - **_1-data-exploration.ipynb_** were the data exploration of our datasat is made.
