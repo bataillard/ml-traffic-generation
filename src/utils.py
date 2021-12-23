@@ -83,9 +83,18 @@ def add_time_period_cols(data, time_length, time_string):
 
 # --- WindowGenerator CLASS ---
 class WindowGenerator():
+    """A class representing a sliding time window utility"""
     def __init__(self, input_width, label_width, shift,
                  train_df, val_df, test_df, mean, std,
                  label_columns=None, zero_column='n_vehicles'):
+        """Creates a window of size (input_width + shift), considers the first `input_width` 
+        indicies to be inputs and the last `label_width` indicies to be outputs.
+        Takes a training, validation, and test dataset to slide window over and transform into
+        TensorFlow datasets. 
+        Takes the mean and std of the training data to allow it to filter zero weeks, 
+        which are computed on `zero_column`.
+        Takes a list of labels that the window has to output `label_columns`"""
+        
         # Store the raw data.
         self.train_df = train_df
         self.val_df = val_df
@@ -128,8 +137,13 @@ class WindowGenerator():
         self._example = inputs, labels
     
     def split_window(self, features):
+        """Takes a TF dataset of (batch, window, features) and 
+        splits the window to keep only the input and output parts.
+        Returns a tuple of the ((batch, input_size, features), (batch, label_size, num_labels)) """
         inputs = features[:, self.input_slice, :]
         labels = features[:, self.labels_slice, :]
+        
+        # If specific columns to predict, only keep those ones in output feature columns
         if self.label_columns is not None:
             labels = tf.stack(
                 [labels[:, :, self.column_indices[name]] for name in self.label_columns],
@@ -144,6 +158,10 @@ class WindowGenerator():
     
     
     def plot(self, model=None, plot_col='n_vehicles', max_subplots=3):
+        """Plots three sample (input, output) tuples from the training data
+        Can take a model to also plot model(input) along with output.
+        Plots column `plot_col`"""
+        
         inputs, labels = self.example
         plot_col_index = self.column_indices[plot_col]
         max_n = min(max_subplots, len(inputs))
@@ -169,6 +187,8 @@ class WindowGenerator():
             
             ax_out.plot(self.label_indices, labels[n, :, label_col_index],
                         label='Labels', color='#2ca02c', marker='.', ms=10)
+            
+            # Plot predictions
             if model is not None:
                 predictions = model(inputs)
                 ax_out.scatter(self.label_indices, predictions[n, :, label_col_index], 
@@ -184,16 +204,25 @@ class WindowGenerator():
         return fig
     
     def filter_zero_weeks(self, row):
-            start = row[0:self.input_width, self.zero_column_index] * self.std + self.mean
-            end = row[self.label_start:self.label_start + self.label_width,
-                        self.zero_column_index] * self.std + self.mean
-                        
-            # Both start or end must be non zero
-            return tf.logical_and(tf.reduce_any(tf.abs(start) >= 1e-4), 
-                                  tf.reduce_any(tf.abs(end) >= 1e-4))
+        """Takes a (hour, features) dataset and returns true if 
+        at least one value in the `self.zero_column` is non zero"""
+        
+        start = row[0:self.input_width, self.zero_column_index] * self.std + self.mean
+        end = row[self.label_start:self.label_start + self.label_width,
+                    self.zero_column_index] * self.std + self.mean
+
+        # Both start or end must be non zero
+        return tf.logical_and(tf.reduce_any(tf.abs(start) >= 1e-4), 
+                              tf.reduce_any(tf.abs(end) >= 1e-4))
 
     
     def make_dataset(self, data, training=True):
+        """Takes a pandas time series and turns it into a 
+        Tensorflow dataset of ([batch, in_width, features],[batch, out_width, labels]).
+        If in training, it will slide the window one by one over the data, shuffle it, 
+        batch it in batches of 32, and filter zero weeks.
+        If not, it will have a stride of one week, will not shuffle it nor filter zero 
+        weeks and will have a batch size of 52. In this mode, one batch is a 52 sequential weeks"""
 
         batch_size = 32 if training else 52
         sequence_stride = 1 if training else self.input_width
@@ -218,14 +247,17 @@ class WindowGenerator():
     
     @property
     def train(self):
+        """The training set as a TF Dataset"""
         return self.make_dataset(self.train_df)
     
     @property
     def val(self):
+        """The training set as a TF Dataset"""
         return self.make_dataset(self.val_df)
     
     @property
     def test(self):
+        """The training set as a TF Dataset"""
         return self.make_dataset(self.test_df)
     
     @property
@@ -240,23 +272,11 @@ class WindowGenerator():
         return result
 
 # --- WINDOWS ---
-def single_step_window(train, val, test, label_cols=['n_vehicles']):
-    return WindowGenerator(
-        train_df=train, val_df=val, test_df=test,
-        input_width=1, label_width=1, shift=1,
-        label_columns=label_cols)
 
-def wide_window(train, val, test, label_cols=['n_vehicles']):
-    return WindowGenerator(input_width=24, label_width=24, shift=1, label_columns=label_cols,
-                           train_df=train, val_df=val, test_df=test)
-
-def conv_window(train, val, test, input_w=1, label_w=1, label_cols=['n_vehicles']):
-    return WindowGenerator(input_width=input_w, label_width=label_w, shift=1, label_columns=label_cols,
-                            train_df=train, val_df=val, test_df=test)
-
-# Better function easier to understand in code (just use constructor otherwise lol)
+# Better function easier to understand in code (just use constructor otherwise)
 def make_window(train, val, test, mean, std,
                 input_w=1, label_w=1, shift=1, label_cols=['n_vehicles']):
+    """Utility function to simplify window creation syntax"""
     return WindowGenerator(input_width=input_w, label_width=label_w, shift=shift, label_columns=label_cols, 
                           train_df=train, val_df=val, test_df=test, mean=mean, std=std)
 
@@ -264,6 +284,9 @@ def make_window(train, val, test, mean, std,
 def compile_and_fit(model, data, patience=2, data_is_window=True,
                     metrics=[tf.metrics.MeanSquaredError(),
                              tf.metrics.MeanAbsoluteError()]):
+    """Takes a model, fits it to data using metrics as early stopping parameters
+    If data_is_window is true, first extracts the train and val datasets from the window, 
+    otherwise unrolls the data tuple"""
     MAX_EPOCHS = 20
     early_stopping = tf.keras.callbacks.EarlyStopping(monitor='val_loss',
                                                       patience=patience,
@@ -284,6 +307,7 @@ def compile_and_fit(model, data, patience=2, data_is_window=True,
     return history
 
 def lstm_model(num_labels=3, week_steps=168):
+    """Our best performing model determined in notebook 2"""
     return tf.keras.Sequential([
         # Shape [batch, time, features] => [batch, lstm_units].
         tf.keras.layers.LSTM(32, return_sequences=False),
