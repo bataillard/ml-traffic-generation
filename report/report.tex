@@ -91,7 +91,7 @@ A REVOIR/COMPLETER AVEC LA PARTIE DATA EXPLORATION DU NOTEBOOK 5
 
 We notice some periods of time with missing data points, specially towards the start of the COVID pandemic so we decide to omit this time period. After some inspections of the monthly number of vehicles per year (see Fig. 1 below), there are entire months with no data particularly in 2013 and 2014. \par
 
-\begin{figure}[h]
+\begin{figure}[ht]
   \includegraphics[scale = 0.63]{report/img/monthly-number-vehicles-per-year.png}
   \caption{Monthly number of vehicles per year. Horizontal axis corresponds to the month, the vertical axis to the number of vehicles per month.}
   \label{monthly-number-of-vehicles-per-year}
@@ -215,6 +215,7 @@ A neural network with a single hidden layer of 512 neurons and ReLU activation.
 
 A recurrent neural network with a layer of 32 LSTM cells, followed by a fully connected layer.
 
+
 \subsection{Discrete event generation}
 
 Once we have predicted a rate of vehicles passing in each time interval, we now have to generate discrete events. We will work upon the assumption that vehicle arrival times are drawn from a real-world stochastic process. Our aim is to draw samples from the same distribution to get random but representative results.
@@ -223,7 +224,7 @@ We can simulate such events with a Poisson process \cite{poisson} with rate equa
 
 To improve the
 
-Finally, once a rate has been assigned to each 5-minute interval, one can finally generate arrival times with the following Poisson process (adapted from M. Bierlaire \cite{poisson}):
+Finally, once a rate has been assigned to each 5-minute interval, one can finally generate arrival times with the following Poisson process (adapted from Prof. M. Bierlaire \cite{poisson}):
 \begin{algorithmic}[1]
     \State $A \gets $ empty list
     \State $t = 0$
