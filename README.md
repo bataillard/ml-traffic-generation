@@ -1,8 +1,12 @@
-# CS-433 - Machine Learning project 2
+# Discrete traffic data generation using ML methods
 
 ## Introduction
 The aim of this project is to learn to use the concepts of machine learning presented in the lectures and practiced in the labs on a
 real-world dataset. For this project we chose to collaborate with an EPFL lab TRANSP-OR who provided a historical traffic dataset of a bridge in Switzerland, in order to generate discrete traffic data using ML methods.
+
+This project was done during the CS-433 Machine Learning course from EPFL
+
+Read the [final report](https://raw.githubusercontent.com/bataillard/ml-traffic-generation/master/ML-Project-2.pdf).
 
 ## Organisation
 This project is organized as follows :
